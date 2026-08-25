@@ -319,10 +319,15 @@ services:
 
 volumes:
   mysql-data:
+    external: true
   postgres-data:
+    external: true
   mongo-data:
+    external: true
   redis-data:
+    external: true
   rabbitmq-data:
+    external: true
 
 
 # =========================
