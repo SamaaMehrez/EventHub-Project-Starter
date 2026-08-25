@@ -1,0 +1,334 @@
+services:
+
+  # =========================
+  # Infrastructure
+  # =========================
+
+  mysql:
+    image: mysql:8.4
+    container_name: mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: password123
+      MYSQL_DATABASE: eventhub_catalog
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - eventhub-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-ppassword123"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: eventhub
+      POSTGRES_PASSWORD: eventhub
+      POSTGRES_DB: eventhub_auth
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - eventhub-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eventhub -d eventhub_auth"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  mongo:
+    image: mongo:7
+    container_name: mongo
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - eventhub-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    networks:
+      - eventhub-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - eventhub-net
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+
+  # =========================
+  # Backend Services
+  # =========================
+
+  catalog:
+    build:
+      context: ./services/legacy-catalog-java
+      dockerfile: Containerfile
+    image: eventhub-catalog
+    container_name: catalog
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/eventhub_catalog
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: password123
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - eventhub-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8081/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+
+  auth:
+    build:
+      context: ./services/auth-service-node
+      dockerfile: Containerfile
+    image: eventhub-auth
+    container_name: auth
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: eventhub
+      PGPASSWORD: eventhub
+      PGDATABASE: eventhub_auth
+      JWT_SECRET: change-me-in-every-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - eventhub-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:8082/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+
+  ai-insight:
+    build:
+        context: ./services/ai-insight-service-python
+        dockerfile: Containerfile
+    image: eventhub-ai-insight
+    container_name: ai-insight
+    restart: unless-stopped
+    ports:
+      - "8084:8084"
+    networks:
+      - eventhub-net
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8084/health')"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+
+  booking:
+    build:
+      context: ./services/booking-service-python
+      dockerfile: Containerfile
+    image: eventhub-booking
+    container_name: booking
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    environment:
+      MONGO_URI: mongodb://mongo:27017
+      MONGO_DB: eventhub_bookings
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      RABBITMQ_QUEUE: bookings
+      AI_INSIGHT_URL: http://ai-insight:8084
+    depends_on:
+      mongo:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      ai-insight:
+        condition: service_healthy
+    networks:
+      - eventhub-net
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8083/health')"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+
+  notification:
+    build:
+      context: ./services/notification-worker-go
+      dockerfile: Containerfile
+    image: eventhub-notification
+    container_name: notification
+    restart: unless-stopped
+    environment:
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      RABBITMQ_QUEUE: bookings
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - eventhub-net
+
+
+  analytics:
+    build:
+      context: ./services/analytics-service-python
+      dockerfile: Containerfile
+    image: eventhub-analytics
+    container_name: analytics
+    restart: unless-stopped
+    ports:
+      - "8085:8085"
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      BOOKING_SERVICE_URL: http://booking:8083
+      CATALOG_SERVICE_URL: http://catalog:8081
+      SNAPSHOT_KEY: analytics:snapshot
+    depends_on:
+      redis:
+        condition: service_healthy
+      booking:
+        condition: service_healthy
+      catalog:
+        condition: service_healthy
+    networks:
+      - eventhub-net
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8085/health')"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+
+  # =========================
+  # Frontend
+  # =========================
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Containerfile
+    image: eventhub-frontend
+    container_name: frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      analytics:
+        condition: service_healthy
+    networks:
+      - eventhub-net
+
+
+  # =========================
+  # Analytics Job
+  # =========================
+
+  analytics-job:
+    image: eventhub-analytics
+    container_name: analytics-job
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      BOOKING_SERVICE_URL: http://booking:8083
+      CATALOG_SERVICE_URL: http://catalog:8081
+      SNAPSHOT_KEY: analytics:snapshot
+    depends_on:
+      analytics:
+        condition: service_healthy
+      booking:
+        condition: service_healthy
+      catalog:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["python", "job.py"]
+    profiles: ["job"]
+    networks:
+      - eventhub-net
+    restart: "no"
+
+
+# =========================
+# Volumes
+# =========================
+
+volumes:
+  mysql-data:
+  postgres-data:
+  mongo-data:
+  redis-data:
+  rabbitmq-data:
+
+
+# =========================
+# Network
+# =========================
+
+networks:
+  eventhub-net:
+    name: eventhub-net
