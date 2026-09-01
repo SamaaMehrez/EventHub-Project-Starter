@@ -77,7 +77,7 @@ export default function Dashboard() {
     return (
       <main className="page content">
         <div className="loading-panel">
-          Loading insights…
+          Loading Insights…
         </div>
       </main>
     );
@@ -124,7 +124,7 @@ export default function Dashboard() {
         <div>
           <span className="eyebrow">OVERVIEW</span>
 
-          <h1>Event insights</h1>
+          <h1>Event Insights</h1>
 
           <p>
             A snapshot generated from the activity in your
@@ -160,7 +160,7 @@ export default function Dashboard() {
         </div>
 
         <div className="metric">
-          <span>Positive reviews</span>
+          <span>Positive Reviews</span>
           <b>{positiveReviews}</b>
           <i>↗</i>
         </div>
@@ -175,7 +175,7 @@ export default function Dashboard() {
 
           <div className="panel-heading">
             <div>
-              <h3>Bookings over time</h3>
+              <h3>Bookings Over Time</h3>
               <span>Last 14 days</span>
             </div>
           </div>
@@ -226,8 +226,8 @@ export default function Dashboard() {
 
           <div className="panel-heading">
             <div>
-              <h3>Review sentiment</h3>
-              <span>Overall review distribution</span>
+              <h3>Review Sentiment</h3>
+              <span>Overall Review Distribution</span>
             </div>
           </div>
 
@@ -276,7 +276,7 @@ export default function Dashboard() {
 
         <div className="panel-heading">
           <div>
-            <h3>Detailed event statistics</h3>
+            <h3>Detailed Event Statistics</h3>
             <span>
               Click a column to sort
             </span>

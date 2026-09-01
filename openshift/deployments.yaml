@@ -290,7 +290,7 @@ spec:
       containers:
         - name: frontend
           image: image-registry.openshift-image-registry.svc:5000/samaamehrez6-dev/frontend:latest
-          ports: [{ containerPort: 80 }]
+          ports: [{ containerPort: 8080 }]
           resources:
             requests: { cpu: 50m, memory: 64Mi }
             limits: { cpu: 200m, memory: 128Mi }
@@ -301,7 +301,7 @@ metadata:
   name: frontend
 spec:
   selector: { app: frontend }
-  ports: [{ port: 3000, targetPort: 80 }]
+  ports: [{ port: 3000, targetPort: 8080 }]
 ---
 apiVersion: route.openshift.io/v1
 kind: Route
@@ -309,5 +309,5 @@ metadata:
   name: frontend
 spec:
   to: { kind: Service, name: frontend }
-  port: { targetPort: 3000 }
+  port: { targetPort: 8080 }
   tls: { termination: edge }
