@@ -1,12 +1,3 @@
-# EventHub Phase 4 -- buildconfigs.yaml
-#
-# One ImageStream + BuildConfig per service. Each BuildConfig points at
-# a subdirectory (contextDir) of the same public GitHub repo and uses
-# that subdirectory's existing Containerfile -- no separate repos
-# needed, no Docker Hub push/pull step. `oc start-build` triggers a
-# build; the result lands in the matching ImageStream, which the
-# Deployments (next file) reference directly.
-
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:

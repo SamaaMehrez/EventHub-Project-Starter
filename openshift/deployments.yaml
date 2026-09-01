@@ -1,11 +1,3 @@
-# EventHub Phase 4 -- deployments.yaml
-#
-# One Deployment + Service per application service, referencing the
-# images built by buildconfigs.yaml. Every backend service that the
-# frontend calls directly (auth, catalog, booking, ai-insight,
-# analytics) also gets a Route, since the browser needs a real public
-# URL for each -- it can't resolve internal Kubernetes DNS names.
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
