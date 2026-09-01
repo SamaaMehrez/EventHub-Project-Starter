@@ -1,67 +1,131 @@
-const AUTH_URL = 'http://localhost:8082';
-const CATALOG_URL = 'http://localhost:8081';
-const BOOKING_URL = 'http://localhost:8083';
-const AI_URL = 'http://localhost:8084';
-const ANALYTICS_URL = 'http://localhost:8085';
+function decodeToken(token) {
+  try {
+    if (!token) return null;
 
-async function request(url, options = {}) {
-  const res = await fetch(url, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-    },
+    const payload = token.split('.')[1];
+    if (!payload) return null;
+
+    const decoded = atob(
+      payload.replace(/-/g, '+').replace(/_/g, '/')
+    );
+
+    return JSON.parse(decoded);
+  } catch {
+    return null;
+  }
+}
+async function request(path, options = {}) {
+  const token = localStorage.getItem('eventhub_token');
+
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(options.headers || {}),
+  };
+
+  const response = await fetch(path, {
     ...options,
+    headers,
   });
 
-  if (!res.ok) {
-    throw new Error(
-        `${options.method || 'GET'} ${url} failed: ${res.status}`
-    );
+  let data = null;
+
+  try {
+    data = await response.json();
+  } catch {
+    // Some responses may not contain JSON.
   }
 
-  return res.json();
+  if (!response.ok) {
+    const message =
+      data?.error ||
+      data?.detail ||
+      `Request failed (${response.status})`;
+
+    throw new Error(message);
+  }
+
+  return data;
 }
 
 export const api = {
-  // Auth Service - 8082
-  login: (email, password) =>
-      request(`${AUTH_URL}/api/auth/login`, {
-        method: 'POST',
-        body: JSON.stringify({ email, password }),
-      }),
+  // =========================
+  // AUTH - 8082
+  // =========================
 
   register: (email, password) =>
-      request(`${AUTH_URL}/api/auth/register`, {
-        method: 'POST',
-        body: JSON.stringify({ email, password }),
+    request('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({
+        email,
+        password,
       }),
+    }),
 
-  // Catalog Service - 8081
+  login: (email, password) =>
+    request('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({
+        email,
+        password,
+      }),
+    }),
+
+  // =========================
+  // CATALOG - 8081
+  // =========================
+
   catalog: () =>
-      request(`${CATALOG_URL}/api/catalog`),
+    request('/api/catalog'),
 
-  // Booking Service - 8083
-  book: (userId, eventId) =>
-      request(`${BOOKING_URL}/api/bookings`, {
-        method: 'POST',
-        body: JSON.stringify({ userId, eventId }),
-      }),
+  // =========================
+  // BOOKING - 8083
+  // =========================
 
-  // AI Insight Service - 8084
-  analyze: (text) =>
-      request(`${AI_URL}/api/analyze`, {
-        method: 'POST',
-        body: JSON.stringify({ text }),
-      }),
+book: (userId, eventId) =>
+  request('/api/bookings', {
+    method: 'POST',
+    body: JSON.stringify({
+      userId: String(userId),
+      eventId: Number(eventId),
+    }),
+  }),
 
-  // Booking Service - 8083
+  bookings: () =>
+    request('/api/bookings'),
+
+  // =========================
+  // REVIEWS - 8083
+  // =========================
+
   review: (bookingId, text) =>
-      request(`${BOOKING_URL}/api/bookings/${bookingId}/review`, {
-        method: 'POST',
-        body: JSON.stringify({ text }),
+    request(`/api/bookings/${bookingId}/review`, {
+      method: 'POST',
+      body: JSON.stringify({
+        text,
       }),
+    }),
 
-  // Analytics Service - 8085
+  reviews: () =>
+    request('/api/reviews'),
+
+  // =========================
+  // AI INSIGHT - 8084
+  // =========================
+
+  analyze: (text) =>
+    request('/api/analyze', {
+      method: 'POST',
+      body: JSON.stringify({
+        text,
+      }),
+    }),
+
+  // =========================
+  // ANALYTICS - 8085
+  // =========================
+
   analyticsSummary: () =>
-      request(`${ANALYTICS_URL}/api/analytics/summary`),
+    request('/api/analytics/summary'),
 };
+export { decodeToken };
