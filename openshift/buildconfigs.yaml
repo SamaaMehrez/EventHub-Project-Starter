@@ -1,0 +1,203 @@
+# EventHub Phase 4 -- buildconfigs.yaml
+#
+# One ImageStream + BuildConfig per service. Each BuildConfig points at
+# a subdirectory (contextDir) of the same public GitHub repo and uses
+# that subdirectory's existing Containerfile -- no separate repos
+# needed, no Docker Hub push/pull step. `oc start-build` triggers a
+# build; the result lands in the matching ImageStream, which the
+# Deployments (next file) reference directly.
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: catalog
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: catalog
+spec:
+  source:
+    type: Git
+    git:
+      uri: https://github.com/SamaaMehrez/EventHub-Project-Starter.git
+      ref: main
+    contextDir: services/legacy-catalog-java
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Containerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: catalog:latest
+  triggers:
+    - type: ConfigChange
+
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: auth
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: auth
+spec:
+  source:
+    type: Git
+    git:
+      uri: https://github.com/SamaaMehrez/EventHub-Project-Starter.git
+      ref: main
+    contextDir: services/auth-service-node
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Containerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: auth:latest
+  triggers:
+    - type: ConfigChange
+
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: booking
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: booking
+spec:
+  source:
+    type: Git
+    git:
+      uri: https://github.com/SamaaMehrez/EventHub-Project-Starter.git
+      ref: main
+    contextDir: services/booking-service-python
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Containerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: booking:latest
+  triggers:
+    - type: ConfigChange
+
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: ai-insight
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: ai-insight
+spec:
+  source:
+    type: Git
+    git:
+      uri: https://github.com/SamaaMehrez/EventHub-Project-Starter.git
+      ref: main
+    contextDir: services/ai-insight-service-python
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Containerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: ai-insight:latest
+  triggers:
+    - type: ConfigChange
+
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: analytics
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: analytics
+spec:
+  source:
+    type: Git
+    git:
+      uri: https://github.com/SamaaMehrez/EventHub-Project-Starter.git
+      ref: main
+    contextDir: services/analytics-service-python
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Containerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: analytics:latest
+  triggers:
+    - type: ConfigChange
+
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: notification
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: notification
+spec:
+  source:
+    type: Git
+    git:
+      uri: https://github.com/SamaaMehrez/EventHub-Project-Starter.git
+      ref: main
+    contextDir: services/notification-worker-go
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Containerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: notification:latest
+  triggers:
+    - type: ConfigChange
+
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: frontend
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: frontend
+spec:
+  source:
+    type: Git
+    git:
+      uri: https://github.com/SamaaMehrez/EventHub-Project-Starter.git
+      ref: main
+    contextDir: frontend
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Containerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: frontend:latest
+  triggers:
+    - type: ConfigChange

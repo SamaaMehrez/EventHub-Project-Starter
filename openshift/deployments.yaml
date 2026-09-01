@@ -1,0 +1,313 @@
+# EventHub Phase 4 -- deployments.yaml
+#
+# One Deployment + Service per application service, referencing the
+# images built by buildconfigs.yaml. Every backend service that the
+# frontend calls directly (auth, catalog, booking, ai-insight,
+# analytics) also gets a Route, since the browser needs a real public
+# URL for each -- it can't resolve internal Kubernetes DNS names.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalog
+  labels: { app: catalog }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: catalog }
+  template:
+    metadata:
+      labels: { app: catalog }
+    spec:
+      containers:
+        - name: catalog
+          image: image-registry.openshift-image-registry.svc:5000/samaamehrez6-dev/catalog:latest
+          ports: [{ containerPort: 8081 }]
+          env:
+            - { name: SPRING_DATASOURCE_URL, value: "jdbc:mysql://mysql:3306/eventhub_catalog" }
+            - { name: SPRING_DATASOURCE_USERNAME, value: "root" }
+            - { name: SPRING_DATASOURCE_PASSWORD, value: "password123" }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: 500m, memory: 512Mi }
+          readinessProbe:
+            httpGet: { path: /health, port: 8081 }
+            initialDelaySeconds: 30
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: catalog
+spec:
+  selector: { app: catalog }
+  ports: [{ port: 8081, targetPort: 8081 }]
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: catalog
+spec:
+  to: { kind: Service, name: catalog }
+  port: { targetPort: 8081 }
+  tls: { termination: edge }
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth
+  labels: { app: auth }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: auth }
+  template:
+    metadata:
+      labels: { app: auth }
+    spec:
+      containers:
+        - name: auth
+          image: image-registry.openshift-image-registry.svc:5000/samaamehrez6-dev/auth:latest
+          ports: [{ containerPort: 8082 }]
+          env:
+            - { name: PORT, value: "8082" }
+            - { name: PGHOST, value: "postgres" }
+            - { name: PGPORT, value: "5432" }
+            - { name: PGUSER, value: "eventhub" }
+            - { name: PGPASSWORD, value: "eventhub" }
+            - { name: PGDATABASE, value: "eventhub_auth" }
+            - { name: JWT_SECRET, value: "change-me-in-every-environment" }
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { cpu: 300m, memory: 256Mi }
+          readinessProbe:
+            httpGet: { path: /health, port: 8082 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth
+spec:
+  selector: { app: auth }
+  ports: [{ port: 8082, targetPort: 8082 }]
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: auth
+spec:
+  to: { kind: Service, name: auth }
+  port: { targetPort: 8082 }
+  tls: { termination: edge }
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-insight
+  labels: { app: ai-insight }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: ai-insight }
+  template:
+    metadata:
+      labels: { app: ai-insight }
+    spec:
+      containers:
+        - name: ai-insight
+          image: image-registry.openshift-image-registry.svc:5000/samaamehrez6-dev/ai-insight:latest
+          ports: [{ containerPort: 8084 }]
+          env:
+            - { name: PORT, value: "8084" }
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { cpu: 300m, memory: 256Mi }
+          readinessProbe:
+            httpGet: { path: /health, port: 8084 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-insight
+spec:
+  selector: { app: ai-insight }
+  ports: [{ port: 8084, targetPort: 8084 }]
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: ai-insight
+spec:
+  to: { kind: Service, name: ai-insight }
+  port: { targetPort: 8084 }
+  tls: { termination: edge }
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: booking
+  labels: { app: booking }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: booking }
+  template:
+    metadata:
+      labels: { app: booking }
+    spec:
+      containers:
+        - name: booking
+          image: image-registry.openshift-image-registry.svc:5000/samaamehrez6-dev/booking:latest
+          ports: [{ containerPort: 8083 }]
+          env:
+            - { name: PORT, value: "8083" }
+            - { name: MONGO_URI, value: "mongodb://mongo:27017" }
+            - { name: MONGO_DB, value: "eventhub_bookings" }
+            - { name: RABBITMQ_URL, value: "amqp://guest:guest@rabbitmq:5672/" }
+            - { name: RABBITMQ_QUEUE, value: "bookings" }
+            - { name: AI_INSIGHT_URL, value: "http://ai-insight:8084" }
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { cpu: 300m, memory: 256Mi }
+          readinessProbe:
+            httpGet: { path: /health, port: 8083 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: booking
+spec:
+  selector: { app: booking }
+  ports: [{ port: 8083, targetPort: 8083 }]
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: booking
+spec:
+  to: { kind: Service, name: booking }
+  port: { targetPort: 8083 }
+  tls: { termination: edge }
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification
+  labels: { app: notification }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: notification }
+  template:
+    metadata:
+      labels: { app: notification }
+    spec:
+      containers:
+        - name: notification
+          image: image-registry.openshift-image-registry.svc:5000/samaamehrez6-dev/notification:latest
+          env:
+            - { name: RABBITMQ_URL, value: "amqp://guest:guest@rabbitmq:5672/" }
+            - { name: RABBITMQ_QUEUE, value: "bookings" }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 200m, memory: 128Mi }
+          # No readinessProbe/Service/Route: this is a pure queue
+          # consumer with no HTTP server, same as in Phase 2/3.
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics
+  labels: { app: analytics }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: analytics }
+  template:
+    metadata:
+      labels: { app: analytics }
+    spec:
+      containers:
+        - name: analytics
+          image: image-registry.openshift-image-registry.svc:5000/samaamehrez6-dev/analytics:latest
+          ports: [{ containerPort: 8085 }]
+          env:
+            - { name: PORT, value: "8085" }
+            - { name: REDIS_URL, value: "redis://redis:6379/0" }
+            - { name: BOOKING_SERVICE_URL, value: "http://booking:8083" }
+            - { name: CATALOG_SERVICE_URL, value: "http://catalog:8081" }
+            - { name: SNAPSHOT_KEY, value: "analytics:snapshot" }
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { cpu: 300m, memory: 256Mi }
+          readinessProbe:
+            httpGet: { path: /health, port: 8085 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics
+spec:
+  selector: { app: analytics }
+  ports: [{ port: 8085, targetPort: 8085 }]
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: analytics
+spec:
+  to: { kind: Service, name: analytics }
+  port: { targetPort: 8085 }
+  tls: { termination: edge }
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  labels: { app: frontend }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: frontend }
+  template:
+    metadata:
+      labels: { app: frontend }
+    spec:
+      containers:
+        - name: frontend
+          image: image-registry.openshift-image-registry.svc:5000/samaamehrez6-dev/frontend:latest
+          ports: [{ containerPort: 80 }]
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 200m, memory: 128Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+spec:
+  selector: { app: frontend }
+  ports: [{ port: 3000, targetPort: 80 }]
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: frontend
+spec:
+  to: { kind: Service, name: frontend }
+  port: { targetPort: 3000 }
+  tls: { termination: edge }
